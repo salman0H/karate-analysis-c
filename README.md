@@ -1,36 +1,62 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+## سامانه هوشمند آنالیز بدنی — باشگاه کاراته شرکت برق منطقه‌ای خراسان
 
-## Getting Started
+Smart Karate Body Analytics System: Next.js (App Router) + TypeScript + Tailwind CSS,
+with a Postgres/Prisma backend, Groq (Llama 3) AI analysis, and a branded Persian/RTL PDF report.
 
-First, run the development server:
+### Architecture
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- **Dynamic Schema Registry** — `src/config/metrics.config.ts` is the single source of truth for
+  all 25 Xiaomi S400 body metrics. The form, the AI prompt, and the PDF renderer all read from this
+  array. The database stores metrics in a single `metrics` JSONB column (see `prisma/schema.prisma`),
+  so adding/removing a metric never requires a migration or touching rendering code.
+- **Separation of concerns**:
+  - Data ingestion: `src/components/athlete-form.tsx` + `src/components/selfie-capture.tsx`
+  - AI processing: `src/app/api/analyze/route.ts` (Groq SDK, server-side only)
+  - Persistence: `src/app/api/athletes/route.ts` + `src/lib/prisma.ts`
+  - Presentation: `src/components/pdf/report-document.tsx` + `src/app/api/pdf/route.tsx`
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Setup
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. **Install dependencies** (already run during scaffolding):
+   ```bash
+   npm install
+   ```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+2. **Configure environment variables** — copy `.env.example` to `.env` and fill in:
+   ```bash
+   cp .env.example .env
+   ```
+   - `DATABASE_URL`: a running PostgreSQL connection string.
+   - `GROQ_API_KEY`: get a free key at https://console.groq.com — required for the AI analysis route.
 
-## Learn More
+3. **Create the database schema**:
+   ```bash
+   npx prisma migrate dev --name init
+   ```
+   (or `npx prisma db push` for a quick sync without migration history)
 
-To learn more about Next.js, take a look at the following resources:
+4. **Run the dev server**:
+   ```bash
+   npm run dev
+   ```
+   Open http://localhost:3000.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### How it fits together
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. The coach fills in athlete info (name, gender, Jalali birthdate — age 10–50 computed automatically
+   via `src/lib/jalali.ts`), captures a selfie with `react-webcam`, and enters the 25 metrics from the
+   Xiaomi S400 scan. Inputs are generated dynamically from `metrics.config.ts` — no hardcoded fields.
+2. On submit, the payload is sent to `/api/analyze`, which builds a Persian prompt instructing Groq's
+   Llama 3 model to act as an elite Karate conditioning coach and return a structured Persian report
+   (general analysis, strengths, areas to improve, 4-week action plan).
+3. Once the AI report is back, "دانلود گزارش PDF" calls `/api/pdf`, which renders
+   `report-document.tsx` with `@react-pdf/renderer` — branded header, selfie, the 25 metrics in a
+   dynamically-mapped grid, and the AI analysis — and streams back a downloadable PDF.
+4. (Optional) `POST /api/athletes` persists the athlete + assessment to Postgres via Prisma for
+   historical tracking across sessions.
 
-## Deploy on Vercel
+### Adding a new metric later
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Add one entry to the `METRICS_CONFIG` array in `src/config/metrics.config.ts` — it automatically
+appears in the form, the Groq prompt, the PDF grid, and zod validation. No other file changes needed.
+# karate-analysis-c

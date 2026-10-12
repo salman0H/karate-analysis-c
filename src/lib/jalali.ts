@@ -15,55 +15,23 @@ function jalCal(jy: number) {
   const bl = breaks.length;
   const gy = jy + 621;
   let leapJ = -14;
-  let jp = breaks[0];
+  const jp = breaks[0];
   if (jy < jp || jy >= breaks[bl - 1]) {
     throw new Error("Invalid Jalali year " + jy);
   }
-  let jump = 0;
+  let jumpPoint = jp;
   for (let i = 1; i < bl; i += 1) {
     const jm = breaks[i];
-    jump = jm - jp;
+    const jump = jm - jumpPoint;
     if (jy < jm) break;
     leapJ = leapJ + div(jump, 33) * 8 + div(jump % 33, 4);
-    jp = jm;
+    jumpPoint = jm;
   }
-  let n = jy - jp;
+  const n = jy - jumpPoint;
   leapJ = leapJ + div(n, 33) * 8 + div((n % 33) + 3, 4);
-  if (jump % 33 === 4 && jump - n === 4) leapJ += 1;
   const leapG = div(gy, 4) - div((div(gy, 100) + 1) * 3, 4) - 150;
   const march = 20 + leapJ - leapG;
-  if (jump - n < 6) n = n - jump + div(jump + 4, 33) * 33;
-  let leap = ((n + 1) % 33) - 1;
-  if (leap === -1) leap = 32;
-  leap = ((leap % 4) + 4) % 4 === 1 ? 1 : 0; // simplified leap flag, recomputed below properly
-  return { leap: isJalaliLeap(jy), march };
-}
-
-function isJalaliLeap(jy: number): boolean {
-  // Standard 2820-year cycle approximation used by jalaali-js
-  const breaks = [
-    -61, 9, 38, 199, 426, 686, 756, 818, 1111, 1181, 1210, 1635, 2060, 2097,
-    2192, 2262, 2324, 2394, 2456, 3178,
-  ];
-  let jp = breaks[0];
-  let jump = 0;
-  for (let i = 1; i < breaks.length; i += 1) {
-    const jm = breaks[i];
-    jump = jm - jp;
-    if (jy < jm) break;
-    jp = jm;
-  }
-  let n = jy - jp;
-  if (jump - n < 6) n = n - jump + div(jump + 4, 33) * 33;
-  let leap = ((n + 1) % 33) - 1;
-  if (leap === -1) leap = 32;
-  return leap % 4 === 1;
-}
-
-const GREG_DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-
-function isGregorianLeap(gy: number) {
-  return (gy % 4 === 0 && gy % 100 !== 0) || gy % 400 === 0;
+  return { march };
 }
 
 function g2d(gy: number, gm: number, gd: number) {
@@ -124,5 +92,3 @@ export function calculateAgeFromJalali(value: string): number | null {
   if (!hasHadBirthdayThisYear) age -= 1;
   return age;
 }
-
-export { isGregorianLeap, GREG_DAYS_IN_MONTH };
